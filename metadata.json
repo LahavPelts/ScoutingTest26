@@ -1,0 +1,5 @@
+{
+  "name": "General Scouter 2230",
+  "description": "FRC Scouting application for General Angels 2230. Features match data collection, local storage, and analysis dashboard.",
+  "requestFramePermissions": []
+}
