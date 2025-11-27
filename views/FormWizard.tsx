@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { ScoutEntry, MatchType, Alliance } from '../types';
+import { ScoutEntry, MatchType, Alliance, CageType } from '../types';
 import { InfoPage } from './InfoPage';
 import { AutoPage } from './AutoPage';
 import { TeleopPage } from './TeleopPage';
@@ -32,7 +33,14 @@ const INITIAL_DATA: ScoutEntry = {
     algaeMissed: 0,
     playedDefence: false 
   },
-  endgame: { defenceLevel: 0, drivingLevel: 0, scouterLevel: 0, disabled: false, comments: '' }
+  endgame: { 
+    defenceLevel: 0, 
+    drivingLevel: 0, 
+    scouterLevel: 0, 
+    cage: CageType.NONE,
+    disabled: false, 
+    comments: '' 
+  }
 };
 
 type Step = 'info' | 'auto' | 'teleop' | 'endgame';

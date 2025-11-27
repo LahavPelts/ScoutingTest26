@@ -18,6 +18,13 @@ export enum StartPosition {
   BOT = 'Bottom'
 }
 
+export enum CageType {
+  DEEP = 'Deep',
+  SHALLOW = 'Shallow',
+  PARK = 'Park',
+  NONE = 'None'
+}
+
 export interface MatchScore {
   l4: number;
   l3: number;
@@ -42,6 +49,7 @@ export interface EndgameData {
   defenceLevel: number; // 0-5
   drivingLevel: number; // 0-5
   scouterLevel: number; // 0-5
+  cage: CageType;
   disabled: boolean;
   comments: string;
 }
@@ -70,6 +78,7 @@ export interface TeamStats {
   avgOverall: number; // Weighted Score
   
   avgCoral: number; // Sum of L1-L4
+  avgCoralAccuracy: number; // % (Made / (Made + Missed))
   avgAlgae: number; // Sum of Proc + Net
   
   avgL4: number;

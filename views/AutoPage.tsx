@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ScoutEntry, AutoData } from '../types';
 import { Counter } from '../components/Counter';

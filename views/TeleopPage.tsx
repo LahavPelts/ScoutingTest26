@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ScoutEntry, TeleopData } from '../types';
 import { Counter } from '../components/Counter';

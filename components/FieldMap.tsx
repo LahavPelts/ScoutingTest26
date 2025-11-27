@@ -1,10 +1,11 @@
+
 import React from 'react';
 import { StartPosition } from '../types';
 
 interface FieldMapProps {
   selected: StartPosition | null;
   onChange: (pos: StartPosition) => void;
-  alliance: 'Red' | 'Blue'; // Kept for interface compatibility, though new visual is generic
+  alliance: 'Red' | 'Blue'; 
   imageUrl?: string;
 }
 
@@ -19,12 +20,12 @@ const positions: { key: StartPosition; top: string }[] = [
 export const FieldMap: React.FC<FieldMapProps> = ({ 
   selected, 
   onChange, 
-  imageUrl = "/field.png" // Placeholder, in a real app ensure this image exists in public folder
+  imageUrl = "/field.png" 
 }) => {
   return (
-    <div className="w-full max-w-xl mx-auto">
+    <div className="w-full max-w-[560px] mx-auto">
       <div 
-        className="relative w-full rounded-lg overflow-hidden bg-gray-100 border border-gray-300 shadow-inner"
+        className="relative w-full rounded-lg overflow-hidden bg-[#f3f3f3] border border-gray-300/50 shadow-inner"
         style={{ 
           aspectRatio: '2 / 1',
           backgroundImage: `url(${imageUrl})`, 
@@ -32,28 +33,24 @@ export const FieldMap: React.FC<FieldMapProps> = ({
           backgroundPosition: 'center' 
         }}
       >
-        {/* Fallback grid if image missing */}
-        <div className="absolute inset-0 grid grid-rows-5 pointer-events-none opacity-10">
-            {[...Array(5)].map((_, i) => <div key={i} className="border-b border-gray-500"></div>)}
-        </div>
-
         {positions.map((p) => (
           <div
             key={p.key}
             role="button"
             onClick={() => onChange(p.key)}
-            className="absolute left-0 w-full h-[20%] cursor-pointer outline-none transition-colors duration-200 hover:bg-blue-400/15"
+            className="absolute left-0 w-full h-[20%] cursor-pointer outline-none transition-colors duration-200 hover:bg-[#2196f3]/15"
             style={{ top: p.top }}
           >
             {selected === p.key && (
-              <div className="absolute inset-0 bg-blue-500/30 backdrop-blur-[1px] flex items-center justify-center">
-                 <span className="text-white font-bold drop-shadow-md text-sm sm:text-base bg-black/20 px-2 rounded">
-                    {p.key}
-                 </span>
+              <div className="absolute inset-0 bg-[#2196f3]/25 flex items-center justify-center">
+                 {/* Optional label if needed, or kept clean as per reference */}
               </div>
             )}
           </div>
         ))}
+      </div>
+      <div className="text-center mt-2 text-sm text-gray-500 font-medium">
+        {selected ? selected : "Tap position on map"}
       </div>
     </div>
   );

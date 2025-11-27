@@ -1,5 +1,6 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { ScoutEntry, TeamStats } from '../types';
+import { ScoutEntry, TeamStats, CageType } from '../types';
 import { getEntries, importData } from '../services/storageService';
 import { generateMockData } from '../services/mockData';
 import { fetchEPAData, StatboticsTeamYear } from '../services/apiService';
@@ -22,6 +23,7 @@ const METRICS: { key: keyof TeamStats; label: string; color: string; group?: str
   { key: 'avgAutoPoints', label: 'Auto', color: '#1e3a8a', group: 'Summary' },
   { key: 'avgTeleopPoints', label: 'Tele', color: '#42A5F5', group: 'Summary' },
   { key: 'avgCoral', label: 'Coral', color: '#00ACC1', group: 'Coral' },
+  { key: 'avgCoralAccuracy', label: 'Acc %', color: '#006064', group: 'Coral' },
   { key: 'avgAlgae', label: 'Algae', color: '#7E57C2', group: 'Algae' },
   { key: 'avgL4', label: 'L4', color: '#26C6DA', group: 'Coral' },
   { key: 'avgL3', label: 'L3', color: '#4DD0E1', group: 'Coral' },
@@ -43,6 +45,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
   const [sortDesc, setSortDesc] = useState(true);
   const [epaData, setEpaData] = useState<Record<string, StatboticsTeamYear>>({});
   const [loadingEpa, setLoadingEpa] = useState(false);
+  const [showCoralBreakdown, setShowCoralBreakdown] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const entries = getEntries();
 
@@ -60,6 +63,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
     const teamMap: Record<string, ScoutEntry[]> = {};
     
     entries.forEach(e => {
+      // If filter is ON, only include entries where they did NOT play defense
       if (filterDefence && e.teleop.playedDefence) return;
       if (!teamMap[e.teamNumber]) teamMap[e.teamNumber] = [];
       teamMap[e.teamNumber].push(e);
@@ -70,13 +74,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
       const count = matches.length;
       const teamEpa = epaData[team];
 
-      let rawStats = { auto: 0, teleop: 0, l4: 0, l3: 0, l2: 0, l1: 0, proc: 0, net: 0, def: 0, coral: 0, algae: 0 };
+      let rawStats = { 
+        auto: 0, teleop: 0, 
+        l4: 0, l3: 0, l2: 0, l1: 0, 
+        proc: 0, net: 0, 
+        defSum: 0, defCount: 0, // Separate counter for defense
+        coralMade: 0, coralMissed: 0,
+        algae: 0 
+      };
       
       if (count > 0) {
         rawStats = matches.reduce((acc, m) => {
           const matchCoral = (m.auto.l4 + m.auto.l3 + m.auto.l2 + m.auto.l1) + (m.teleop.l4 + m.teleop.l3 + m.teleop.l2 + m.teleop.l1);
+          const matchCoralMissed = m.auto.coralMissed + m.teleop.coralMissed;
           const matchAlgae = (m.auto.processor + m.auto.net) + (m.teleop.processor + m.teleop.net);
           
+          let defRating = 0;
+          let defPlayed = 0;
+          if (m.teleop.playedDefence) {
+             defRating = m.endgame.defenceLevel;
+             defPlayed = 1;
+          }
+
           return {
             auto: acc.auto + 
                   m.auto.l4 * POINTS.AUTO.L4 + 
@@ -101,8 +120,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
             l1: acc.l1 + m.auto.l1 + m.teleop.l1,
             proc: acc.proc + m.auto.processor + m.teleop.processor,
             net: acc.net + m.auto.net + m.teleop.net,
-            def: acc.def + m.endgame.defenceLevel,
-            coral: acc.coral + matchCoral,
+            defSum: acc.defSum + defRating,
+            defCount: acc.defCount + defPlayed,
+            coralMade: acc.coralMade + matchCoral,
+            coralMissed: acc.coralMissed + matchCoralMissed,
             algae: acc.algae + matchAlgae
           };
         }, rawStats);
@@ -113,6 +134,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
       let avgTeleop = safeDiv(rawStats.teleop);
       let avgTotal = avgAuto + avgTeleop;
       let source: 'Local' | 'Hybrid' = 'Local';
+
+      // Coral Accuracy Calculation
+      const totalAttempts = rawStats.coralMade + rawStats.coralMissed;
+      const coralAccuracy = totalAttempts > 0 ? (rawStats.coralMade / totalAttempts) * 100 : 0;
+
+      // Defense Calculation (Avg of ONLY matches where they played defense)
+      const avgDef = rawStats.defCount > 0 ? rawStats.defSum / rawStats.defCount : 0;
 
       if (useApiData && teamEpa) {
         source = 'Hybrid';
@@ -127,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
         }
       }
       
-      const overall = (avgAuto * 1.2) + avgTeleop + (safeDiv(rawStats.l4) * 2) + (safeDiv(rawStats.def) * 1.5);
+      const overall = (avgAuto * 1.2) + avgTeleop + (safeDiv(rawStats.l4) * 2) + (avgDef * 1.5);
 
       return {
         teamNumber: team,
@@ -136,7 +164,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
         avgAutoPoints: parseFloat(avgAuto.toFixed(1)),
         avgTeleopPoints: parseFloat(avgTeleop.toFixed(1)),
         avgOverall: parseFloat(overall.toFixed(1)),
-        avgCoral: parseFloat(safeDiv(rawStats.coral).toFixed(1)),
+        avgCoral: parseFloat(safeDiv(rawStats.coralMade).toFixed(1)),
+        avgCoralAccuracy: parseFloat(coralAccuracy.toFixed(1)),
         avgAlgae: parseFloat(safeDiv(rawStats.algae).toFixed(1)),
         avgL4: parseFloat(safeDiv(rawStats.l4).toFixed(1)),
         avgL3: parseFloat(safeDiv(rawStats.l3).toFixed(1)),
@@ -144,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
         avgL1: parseFloat(safeDiv(rawStats.l1).toFixed(1)),
         avgProcessor: parseFloat(safeDiv(rawStats.proc).toFixed(1)),
         avgNet: parseFloat(safeDiv(rawStats.net).toFixed(1)),
-        avgDefenceRating: parseFloat(safeDiv(rawStats.def).toFixed(1)),
+        avgDefenceRating: parseFloat(avgDef.toFixed(1)),
         epaTotal: teamEpa ? parseFloat(teamEpa.epa_total.toFixed(1)) : undefined,
         source
       };
@@ -172,6 +201,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
   };
 
   const handleHeaderClick = (key: keyof TeamStats) => {
+    if (key === 'avgCoral') {
+      setShowCoralBreakdown(!showCoralBreakdown);
+      return;
+    }
     if (sortKey === key) setSortDesc(!sortDesc); else { setSortKey(key); setSortDesc(true); }
   };
 
@@ -186,7 +219,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
     reader.readAsText(file);
   };
 
-  const activeMetrics = useMemo(() => visibleMetrics.size === 0 ? METRICS : METRICS.filter(m => visibleMetrics.has(m.key)), [visibleMetrics]);
+  // Logic to show/hide L1-L4 based on toggle
+  const activeMetrics = useMemo(() => {
+    const base = visibleMetrics.size === 0 ? METRICS : METRICS.filter(m => visibleMetrics.has(m.key));
+    // Filter out L1-L4 if breakdown is hidden
+    return base.filter(m => {
+      if (!showCoralBreakdown && ['avgL1','avgL2','avgL3','avgL4'].includes(m.key)) return false;
+      return true;
+    });
+  }, [visibleMetrics, showCoralBreakdown]);
+
   const selectedStats = stats.filter(s => selectedTeams.includes(s.teamNumber));
 
   if (view === 'team_detail' && selectedTeams.length === 1) {
@@ -196,6 +238,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
     const historyData = teamMatches.map(m => ({ match: `M${m.matchNumber}`, total: (m.auto.l4 * POINTS.AUTO.L4 + m.auto.l3 * POINTS.AUTO.L3 + m.auto.l2 * POINTS.AUTO.L2 + m.auto.l1 * POINTS.AUTO.L1 + m.auto.processor * POINTS.AUTO.PROCESSOR + m.auto.net * POINTS.AUTO.NET + (m.auto.passedLine ? POINTS.AUTO.PASSED_LINE : 0)) + (m.teleop.l4 * POINTS.TELEOP.L4 + m.teleop.l3 * POINTS.TELEOP.L3 + m.teleop.l2 * POINTS.TELEOP.L2 + m.teleop.l1 * POINTS.TELEOP.L1 + m.teleop.processor * POINTS.TELEOP.PROCESSOR + m.teleop.net * POINTS.TELEOP.NET), auto: (m.auto.l4 * POINTS.AUTO.L4 + m.auto.l3 * POINTS.AUTO.L3 + m.auto.l2 * POINTS.AUTO.L2 + m.auto.l1 * POINTS.AUTO.L1 + m.auto.processor * POINTS.AUTO.PROCESSOR + m.auto.net * POINTS.AUTO.NET + (m.auto.passedLine ? POINTS.AUTO.PASSED_LINE : 0)) }));
     const radarData = stat ? [ { subject: 'Auto', A: Math.min(stat.avgAutoPoints / 2, 10), fullMark: 10 }, { subject: 'Teleop', A: Math.min(stat.avgTeleopPoints / 3, 10), fullMark: 10 }, { subject: 'Coral', A: Math.min(stat.avgCoral, 10), fullMark: 10 }, { subject: 'Algae', A: Math.min(stat.avgAlgae, 10), fullMark: 10 }, { subject: 'L4', A: Math.min(stat.avgL4 * 2, 10), fullMark: 10 }, { subject: 'Defense', A: stat.avgDefenceRating * 2, fullMark: 10 }, ] : [];
 
+    // Calculate Capabilities for ID Card
+    const hasL1 = teamMatches.some(m => (m.auto.l1 + m.teleop.l1) > 0);
+    const hasL2 = teamMatches.some(m => (m.auto.l2 + m.teleop.l2) > 0);
+    const hasL3 = teamMatches.some(m => (m.auto.l3 + m.teleop.l3) > 0);
+    const hasL4 = teamMatches.some(m => (m.auto.l4 + m.teleop.l4) > 0);
+    
+    const hasProcessor = teamMatches.some(m => (m.auto.processor + m.teleop.processor) > 0);
+    const hasNet = teamMatches.some(m => (m.auto.net + m.teleop.net) > 0);
+
+    const hasDeep = teamMatches.some(m => m.endgame.cage === CageType.DEEP);
+    const hasShallow = teamMatches.some(m => m.endgame.cage === CageType.SHALLOW);
+    const hasPark = teamMatches.some(m => m.endgame.cage === CageType.PARK);
+
+    const CapabilityRow = ({ label, items }: { label: string, items: { text: string, active: boolean, color: string }[] }) => (
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs font-bold text-gray-500 w-12 uppercase">{label}</span>
+        <div className="flex flex-wrap gap-1">
+          {items.map(item => (
+            <span key={item.text} className={`px-2 py-0.5 rounded text-xs font-bold border ${item.active ? item.color : 'bg-gray-50 text-gray-300 border-gray-100'}`}>
+              {item.text}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+
     return (
         <div className="min-h-screen bg-ga-dark text-gray-900 font-sans w-full max-w-7xl mx-auto shadow-2xl flex flex-col">
             <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-50 flex items-center gap-4">
@@ -204,13 +272,116 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
                 <span className="text-sm font-bold bg-blue-100 text-blue-800 px-3 py-1 rounded-full">Score: {stat?.avgOverall}</span>
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto">
+                {/* Robot ID Card */}
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-blue-200 flex flex-col">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Robot ID</h3>
+                    
+                    <CapabilityRow 
+                        label="Coral" 
+                        items={[
+                            { text: 'L1', active: hasL1, color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+                            { text: 'L2', active: hasL2, color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+                            { text: 'L3', active: hasL3, color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+                            { text: 'L4', active: hasL4, color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+                        ]} 
+                    />
+                    <CapabilityRow 
+                        label="Algae" 
+                        items={[
+                            { text: 'Processor', active: hasProcessor, color: 'bg-purple-100 text-purple-800 border-purple-200' },
+                            { text: 'Net', active: hasNet, color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+                        ]} 
+                    />
+                    <CapabilityRow 
+                        label="Climb" 
+                        items={[
+                            { text: 'Deep', active: hasDeep, color: 'bg-amber-100 text-amber-800 border-amber-200' },
+                            { text: 'Shallow', active: hasShallow, color: 'bg-orange-100 text-orange-800 border-orange-200' },
+                            { text: 'Park', active: hasPark, color: 'bg-gray-100 text-gray-800 border-gray-200' },
+                        ]} 
+                    />
+                     <CapabilityRow 
+                        label="Other" 
+                        items={[
+                            { text: 'High Auto', active: stat ? stat.avgAutoPoints > 12 : false, color: 'bg-green-100 text-green-800 border-green-200' },
+                            { text: 'Defender', active: stat ? stat.avgDefenceRating > 2 : false, color: 'bg-slate-100 text-slate-800 border-slate-200' },
+                        ]} 
+                    />
+                    
+                    <div className="mt-auto grid grid-cols-2 gap-4 text-center pt-2">
+                        <div className="bg-gray-50 p-2 rounded">
+                            <div className="text-xs text-gray-500 uppercase">Avg Coral Acc</div>
+                            <div className="text-xl font-bold text-teal-600">{stat?.avgCoralAccuracy}%</div>
+                        </div>
+                         <div className="bg-gray-50 p-2 rounded">
+                            <div className="text-xs text-gray-500 uppercase">Avg Def</div>
+                            <div className="text-xl font-bold text-gray-600">{stat?.avgDefenceRating > 0 ? stat?.avgDefenceRating : '-'}</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="bg-white p-4 rounded-xl shadow-sm border h-80 flex flex-col items-center justify-center">
                     <h4 className="text-sm font-bold text-gray-500 mb-2 w-full">Robot Profile</h4>
                     <ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}><PolarGrid /><PolarAngleAxis dataKey="subject" tick={{fontSize:10}} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} /><Radar name={team} dataKey="A" stroke="#00ACC1" fill="#00ACC1" fillOpacity={0.6} /></RadarChart></ResponsiveContainer>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border h-80 md:col-span-2">
+                
+                <div className="bg-white p-4 rounded-xl shadow-sm border h-80 md:col-span-2 lg:col-span-3">
                     <h4 className="text-sm font-bold text-gray-500 mb-2">Performance Trend</h4>
                     <ResponsiveContainer width="100%" height="100%"><LineChart data={historyData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="match" tick={{fontSize:10}} /><YAxis /><Tooltip /><Legend /><Line type="monotone" dataKey="total" stroke="#1e3a8a" strokeWidth={3} dot={{r:4}} /><Line type="monotone" dataKey="auto" stroke="#4DD0E1" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer>
+                </div>
+
+                {/* Detailed Match History Table */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden md:col-span-2 lg:col-span-3">
+                    <div className="px-4 py-3 border-b border-gray-200 font-bold text-gray-700 bg-gray-50">Match History</div>
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                            <tr>
+                                <th className="px-3 py-2">Match</th>
+                                <th className="px-3 py-2">Auto Pts</th>
+                                <th className="px-3 py-2">Tele Pts</th>
+                                <th className="px-3 py-2">Coral Stats (Total)</th>
+                                <th className="px-3 py-2">Algae Stats</th>
+                                <th className="px-3 py-2">Climb</th>
+                                <th className="px-3 py-2">Def</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {teamMatches.map(m => {
+                                const autoPts = (m.auto.l4 * POINTS.AUTO.L4 + m.auto.l3 * POINTS.AUTO.L3 + m.auto.l2 * POINTS.AUTO.L2 + m.auto.l1 * POINTS.AUTO.L1 + m.auto.processor * POINTS.AUTO.PROCESSOR + m.auto.net * POINTS.AUTO.NET + (m.auto.passedLine ? POINTS.AUTO.PASSED_LINE : 0));
+                                const telePts = (m.teleop.l4 * POINTS.TELEOP.L4 + m.teleop.l3 * POINTS.TELEOP.L3 + m.teleop.l2 * POINTS.TELEOP.L2 + m.teleop.l1 * POINTS.TELEOP.L1 + m.teleop.processor * POINTS.TELEOP.PROCESSOR + m.teleop.net * POINTS.TELEOP.NET);
+                                
+                                return (
+                                    <tr key={m.id} className="border-b last:border-0 hover:bg-gray-50">
+                                        <td className="px-3 py-2 font-bold">{m.matchType.toUpperCase()}{m.matchNumber}</td>
+                                        <td className="px-3 py-2">{autoPts}</td>
+                                        <td className="px-3 py-2">{telePts}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex gap-2 text-xs">
+                                                <span className={m.auto.l4 + m.teleop.l4 > 0 ? "font-bold text-cyan-700" : "text-gray-400"}>L4:{m.auto.l4 + m.teleop.l4}</span>
+                                                <span className={m.auto.l3 + m.teleop.l3 > 0 ? "font-bold text-cyan-600" : "text-gray-400"}>L3:{m.auto.l3 + m.teleop.l3}</span>
+                                                <span className={m.auto.l2 + m.teleop.l2 > 0 ? "font-bold text-cyan-500" : "text-gray-400"}>L2:{m.auto.l2 + m.teleop.l2}</span>
+                                                <span className={m.auto.l1 + m.teleop.l1 > 0 ? "font-bold text-cyan-400" : "text-gray-400"}>L1:{m.auto.l1 + m.teleop.l1}</span>
+                                            </div>
+                                        </td>
+                                         <td className="px-3 py-2">
+                                            <div className="flex gap-2 text-xs">
+                                                <span className={m.auto.processor + m.teleop.processor > 0 ? "font-bold text-purple-700" : "text-gray-400"}>Proc:{m.auto.processor + m.teleop.processor}</span>
+                                                <span className={m.auto.net + m.teleop.net > 0 ? "font-bold text-purple-600" : "text-gray-400"}>Net:{m.auto.net + m.teleop.net}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${m.endgame.cage === CageType.DEEP ? 'bg-amber-100 text-amber-800' : m.endgame.cage === CageType.SHALLOW ? 'bg-orange-100 text-orange-800' : m.endgame.cage === CageType.PARK ? 'bg-gray-100 text-gray-800' : 'text-gray-400'}`}>
+                                                {m.endgame.cage}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2">{m.endgame.defenceLevel > 0 ? `${m.endgame.defenceLevel}/5` : '-'}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -262,6 +433,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
               </ResponsiveContainer>
             </div>
 
+            {/* Coral Accuracy */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 flex flex-col">
+              <h4 className="text-sm font-bold text-gray-500 mb-2">Coral Accuracy (%)</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={selectedStats}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="teamNumber" tick={{fontSize: 12}} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip cursor={{fill: '#F9FAFB'}} />
+                  <Legend />
+                  <Bar dataKey="avgCoralAccuracy" name="Accuracy" fill="#006064" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
             {/* Radar Comparison */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 flex flex-col">
                <h4 className="text-sm font-bold text-gray-500 mb-2">Profile Comparison</h4>
@@ -301,6 +487,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
                                 <th className="px-4 py-3">L1</th>
                                 <th className="px-4 py-3">Proc</th>
                                 <th className="px-4 py-3">Net</th>
+                                <th className="px-4 py-3">Acc %</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -317,6 +504,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
                                     <td className="px-4 py-3">{s.avgL1}</td>
                                     <td className="px-4 py-3">{s.avgProcessor}</td>
                                     <td className="px-4 py-3">{s.avgNet}</td>
+                                    <td className="px-4 py-3 font-bold">{s.avgCoralAccuracy}%</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -348,7 +536,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
                       <ZAxis type="number" dataKey="avgOverall" range={[60, 400]} />
                       <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                       <Scatter name="Teams" data={stats.filter(s => s.matchesPlayed > 0)} fill="#1e3a8a">
-                         <LabelList dataKey="teamNumber" position="top" style={{fontSize: 10, fontWeight: 'bold'}} />
+                         {/* Removed LabelList to show team numbers only on hover */}
                       </Scatter>
                     </ScatterChart>
                   </ResponsiveContainer>
@@ -382,7 +570,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
              <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Columns</label>
                 <div className="flex flex-wrap gap-2">
-                   {METRICS.map(m => ( <button key={m.key} onClick={() => toggleMetric(m.key as string)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${visibleMetrics.has(m.key as string) ? 'bg-ga-accent text-white border-ga-accent shadow' : 'bg-white text-gray-600 border-gray-200'}`}>{m.label}</button> ))}
+                   {METRICS.filter(m => !['avgL1','avgL2','avgL3','avgL4'].includes(m.key)).map(m => ( <button key={m.key} onClick={() => toggleMetric(m.key as string)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${visibleMetrics.has(m.key as string) ? 'bg-ga-accent text-white border-ga-accent shadow' : 'bg-white text-gray-600 border-gray-200'}`}>{m.label}</button> ))}
                    {visibleMetrics.size > 0 && ( <button onClick={() => setVisibleMetrics(new Set())} className="px-3 py-1.5 rounded-full text-xs font-bold text-red-500 hover:bg-red-50 ml-2">Clear</button> )}
                 </div>
              </div>
@@ -395,7 +583,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
                       <tr>
                          <th className="px-3 py-4 w-10 text-center sticky left-0 bg-gray-50 z-20">#</th>
                          <th className="px-3 py-4 sticky left-10 bg-gray-50 z-20">Team</th>
-                         {activeMetrics.map(m => ( <th key={m.key} onClick={() => handleHeaderClick(m.key)} className="px-3 py-4 text-right cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap min-w-[70px]"><div className="flex items-center justify-end gap-1"><span className={`${sortKey === m.key ? 'text-ga-accent font-bold' : ''}`}>{m.label}</span>{sortKey === m.key && <span className="text-ga-accent">{sortDesc ? '↓' : '↑'}</span>}</div></th> ))}
+                         {activeMetrics.map(m => ( 
+                           <th 
+                              key={m.key} 
+                              onClick={() => handleHeaderClick(m.key)} 
+                              className="px-3 py-4 text-right cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap min-w-[70px]"
+                              title={m.key === 'avgCoral' ? "Click to toggle L1-L4 breakdown" : ""}
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span className={`${sortKey === m.key ? 'text-ga-accent font-bold' : ''} ${m.key === 'avgCoral' ? 'underline decoration-dotted' : ''}`}>{m.label}</span>
+                                {sortKey === m.key && <span className="text-ga-accent">{sortDesc ? '↓' : '↑'}</span>}
+                              </div>
+                            </th> 
+                          ))}
                          <th className="px-3 py-4 text-right w-12 text-gray-400">Plays</th>
                          <th className="px-3 py-4 w-8"></th>
                       </tr>
