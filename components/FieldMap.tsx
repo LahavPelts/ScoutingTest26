@@ -4,47 +4,57 @@ import { StartPosition } from '../types';
 interface FieldMapProps {
   selected: StartPosition | null;
   onChange: (pos: StartPosition) => void;
-  alliance: 'Red' | 'Blue';
+  alliance: 'Red' | 'Blue'; // Kept for interface compatibility, though new visual is generic
+  imageUrl?: string;
 }
 
-export const FieldMap: React.FC<FieldMapProps> = ({ selected, onChange, alliance }) => {
-  const positions = [
-    StartPosition.UP,
-    StartPosition.MID_UP,
-    StartPosition.MID,
-    StartPosition.MID_BOT,
-    StartPosition.BOT
-  ];
+const positions: { key: StartPosition; top: string }[] = [
+  { key: StartPosition.UP, top: "0%" },
+  { key: StartPosition.MID_UP, top: "20%" },
+  { key: StartPosition.MID, top: "40%" },
+  { key: StartPosition.MID_BOT, top: "60%" },
+  { key: StartPosition.BOT, top: "80%" }
+];
 
+export const FieldMap: React.FC<FieldMapProps> = ({ 
+  selected, 
+  onChange, 
+  imageUrl = "/field.png" // Placeholder, in a real app ensure this image exists in public folder
+}) => {
   return (
-    <div className="w-full aspect-[4/5] bg-white rounded-lg border border-gray-300 relative overflow-hidden flex flex-col shadow-inner">
-       {/* Background Grid Lines to simulate map */}
-       <div className="absolute inset-0 grid grid-cols-4 grid-rows-5 pointer-events-none opacity-20">
-         {Array.from({length: 20}).map((_, i) => (
-            <div key={i} className="border border-gray-400"></div>
-         ))}
-       </div>
+    <div className="w-full max-w-xl mx-auto">
+      <div 
+        className="relative w-full rounded-lg overflow-hidden bg-gray-100 border border-gray-300 shadow-inner"
+        style={{ 
+          aspectRatio: '2 / 1',
+          backgroundImage: `url(${imageUrl})`, 
+          backgroundSize: 'cover', 
+          backgroundPosition: 'center' 
+        }}
+      >
+        {/* Fallback grid if image missing */}
+        <div className="absolute inset-0 grid grid-rows-5 pointer-events-none opacity-10">
+            {[...Array(5)].map((_, i) => <div key={i} className="border-b border-gray-500"></div>)}
+        </div>
 
-       <div className="absolute inset-y-0 left-0 w-8 bg-gray-100 border-r border-gray-300 flex flex-col justify-center items-center text-xs text-gray-500 font-bold">
-          <span>W</span><span>A</span><span>L</span><span>L</span>
-       </div>
-       
-       {/* Position Selectors */}
-       <div className="flex-1 flex flex-col z-10 pl-8">
-         {positions.map((pos) => (
-           <button
-             key={pos}
-             onClick={() => onChange(pos)}
-             className={`flex-1 border-b border-gray-200 flex items-center pl-4 transition-colors duration-200
-               ${selected === pos 
-                 ? (alliance === 'Red' ? 'bg-red-100 text-red-900' : 'bg-blue-100 text-blue-900') 
-                 : 'hover:bg-gray-50 text-gray-600'}`}
-           >
-             <div className={`w-3 h-3 rounded-full mr-3 border ${selected === pos ? (alliance === 'Red' ? 'bg-red-600 border-red-600' : 'bg-blue-600 border-blue-600') : 'bg-white border-gray-400'}`}></div>
-             <span className="font-medium text-sm">{pos}</span>
-           </button>
-         ))}
-       </div>
+        {positions.map((p) => (
+          <div
+            key={p.key}
+            role="button"
+            onClick={() => onChange(p.key)}
+            className="absolute left-0 w-full h-[20%] cursor-pointer outline-none transition-colors duration-200 hover:bg-blue-400/15"
+            style={{ top: p.top }}
+          >
+            {selected === p.key && (
+              <div className="absolute inset-0 bg-blue-500/30 backdrop-blur-[1px] flex items-center justify-center">
+                 <span className="text-white font-bold drop-shadow-md text-sm sm:text-base bg-black/20 px-2 rounded">
+                    {p.key}
+                 </span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

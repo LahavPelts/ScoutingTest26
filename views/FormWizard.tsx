@@ -18,9 +18,21 @@ const INITIAL_DATA: ScoutEntry = {
   alliance: Alliance.RED,
   startPosition: null,
   timestamp: 0,
-  auto: { l4: 0, l3: 0, l2: 0, l1: 0, processor: 0, net: 0, passedLine: false },
-  teleop: { l4: 0, l3: 0, l2: 0, l1: 0, processor: 0, net: 0 },
-  endgame: { defenceRobot: false, defenceLevel: 0, drivingLevel: 0, scouterLevel: 0, disabled: false, comments: '' }
+  auto: { 
+    l4: 0, l3: 0, l2: 0, l1: 0, 
+    coralMissed: 0,
+    processor: 0, net: 0, 
+    algaeMissed: 0,
+    passedLine: false 
+  },
+  teleop: { 
+    l4: 0, l3: 0, l2: 0, l1: 0, 
+    coralMissed: 0,
+    processor: 0, net: 0, 
+    algaeMissed: 0,
+    playedDefence: false 
+  },
+  endgame: { defenceLevel: 0, drivingLevel: 0, scouterLevel: 0, disabled: false, comments: '' }
 };
 
 type Step = 'info' | 'auto' | 'teleop' | 'endgame';

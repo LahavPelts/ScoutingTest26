@@ -18,27 +18,6 @@ export const EndgamePage: React.FC<EndgamePageProps> = ({ data, updateData, onSu
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-       {/* Defence Robot Toggle */}
-       <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
-        <div className="flex justify-between items-center mb-2">
-            <span className="text-gray-700 font-bold ml-1">Defence Robot</span>
-        </div>
-        <div className="flex w-full bg-gray-50 rounded-lg p-1 border border-gray-100">
-           <button 
-             onClick={() => updateEndgame('defenceRobot', true)}
-             className={`flex-1 py-3 rounded-md transition-all ${data.endgame.defenceRobot ? 'bg-ga-accent text-white font-bold shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-           >
-             YES
-           </button>
-           <button 
-             onClick={() => updateEndgame('defenceRobot', false)}
-             className={`flex-1 py-3 rounded-md transition-all ${!data.endgame.defenceRobot ? 'bg-ga-accent text-white font-bold shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-           >
-             NO
-           </button>
-        </div>
-      </div>
-
       <StarRating 
         label="Defence Level" 
         value={data.endgame.defenceLevel} 

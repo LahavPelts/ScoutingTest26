@@ -23,18 +23,22 @@ export interface MatchScore {
   l3: number;
   l2: number;
   l1: number;
+  coralMissed: number; // Aggregated misses for all Coral levels
+
   processor: number;
   net: number;
+  algaeMissed: number; // Aggregated misses for Algae
 }
 
 export interface AutoData extends MatchScore {
   passedLine: boolean;
 }
 
-export interface TeleopData extends MatchScore {}
+export interface TeleopData extends MatchScore {
+  playedDefence: boolean;
+}
 
 export interface EndgameData {
-  defenceRobot: boolean;
   defenceLevel: number; // 0-5
   drivingLevel: number; // 0-5
   scouterLevel: number; // 0-5
@@ -63,6 +67,10 @@ export interface TeamStats {
   avgTotalPoints: number;
   avgAutoPoints: number;
   avgTeleopPoints: number;
+  avgOverall: number; // Weighted Score
+  
+  avgCoral: number; // Sum of L1-L4
+  avgAlgae: number; // Sum of Proc + Net
   
   avgL4: number;
   avgL3: number;

@@ -9,6 +9,27 @@ export const ISRAEL_TEAMS = [
   "6738", "6740", "6741", "7039", "7067", "7112", "7177", "7845", "8175", "8223"
 ];
 
+// Scoring Constants
+export const POINTS = {
+  AUTO: {
+    L4: 7,
+    L3: 6,
+    L2: 4,
+    L1: 3,
+    PROCESSOR: 6,
+    NET: 4,
+    PASSED_LINE: 3
+  },
+  TELEOP: {
+    L4: 5,
+    L3: 4,
+    L2: 3,
+    L1: 2,
+    PROCESSOR: 6,
+    NET: 4
+  }
+};
+
 // Mock API data - No longer used, replaced by real Statbotics API
 export const MOCK_API_STATS: Record<string, { auto: number; teleop: number }> = {
   // Deprecated
