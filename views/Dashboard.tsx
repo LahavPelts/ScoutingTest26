@@ -7,10 +7,11 @@ import { fetchEPAData, StatboticsTeamYear } from '../services/apiService';
 import { ISRAEL_TEAMS, POINTS } from '../constants';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid, 
-  ScatterChart, Scatter, ZAxis, ReferenceLine, LabelList,
+  ScatterChart, Scatter, ZAxis, ReferenceLine, 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   LineChart, Line
 } from 'recharts';
+import { Button } from '../components/Button';
 
 interface DashboardProps {
   onBack: () => void;
@@ -39,6 +40,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
   const [view, setView] = useState<'leaderboard' | 'analysis' | 'compare' | 'team_detail'>('leaderboard');
   const [filterDefence, setFilterDefence] = useState(false); 
   const [useApiData, setUseApiData] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [visibleMetrics, setVisibleMetrics] = useState<Set<string>>(new Set());
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<keyof TeamStats>('avgOverall');
@@ -179,12 +181,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
       };
     });
 
-    return calculatedStats.sort((a, b) => {
+    let result = calculatedStats;
+
+    // Filter by search
+    if (searchTerm) {
+      result = result.filter(s => s.teamNumber.includes(searchTerm));
+    }
+
+    // Sort
+    return result.sort((a, b) => {
       const valA = (a[sortKey] as number) || 0;
       const valB = (b[sortKey] as number) || 0;
       return sortDesc ? valB - valA : valA - valB;
     });
-  }, [entries, filterDefence, useApiData, epaData, sortKey, sortDesc]);
+  }, [entries, filterDefence, useApiData, epaData, sortKey, sortDesc, searchTerm]);
 
   const toggleTeamSelect = (team: string) => {
     if (selectedTeams.includes(team)) {
@@ -367,15 +377,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
                                          <td className="px-3 py-2">
                                             <div className="flex gap-2 text-xs">
                                                 <span className={m.auto.processor + m.teleop.processor > 0 ? "font-bold text-purple-700" : "text-gray-400"}>Proc:{m.auto.processor + m.teleop.processor}</span>
-                                                <span className={m.auto.net + m.teleop.net > 0 ? "font-bold text-purple-600" : "text-gray-400"}>Net:{m.auto.net + m.teleop.net}</span>
+                                                <span className={m.auto.net + m.teleop.net > 0 ? "font-bold text-purple-500" : "text-gray-400"}>Net:{m.auto.net + m.teleop.net}</span>
                                             </div>
                                         </td>
-                                        <td className="px-3 py-2">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${m.endgame.cage === CageType.DEEP ? 'bg-amber-100 text-amber-800' : m.endgame.cage === CageType.SHALLOW ? 'bg-orange-100 text-orange-800' : m.endgame.cage === CageType.PARK ? 'bg-gray-100 text-gray-800' : 'text-gray-400'}`}>
-                                                {m.endgame.cage}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2">{m.endgame.defenceLevel > 0 ? `${m.endgame.defenceLevel}/5` : '-'}</td>
+                                        <td className="px-3 py-2">{m.endgame.cage}</td>
+                                        <td className="px-3 py-2">{m.teleop.playedDefence ? `${m.endgame.defenceLevel}★` : '-'}</td>
                                     </tr>
                                 );
                             })}
@@ -388,246 +394,317 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBack }) => {
     );
   }
 
-  // --- COMPARE VIEW ---
-  if (view === 'compare') {
-    // Prepare data for Radar Chart
-    const comparisonRadarData = ['Auto', 'Tele', 'Coral', 'Algae', 'Def'].map(subject => {
-        const entry: Record<string, string | number> = { subject, fullMark: 10 };
-        selectedStats.forEach(s => {
-           let val = 0;
-           switch(subject) {
-              case 'Auto': val = Math.min(s.avgAutoPoints / 2, 10); break;
-              case 'Tele': val = Math.min(s.avgTeleopPoints / 3, 10); break;
-              case 'Coral': val = Math.min(s.avgCoral, 10); break;
-              case 'Algae': val = Math.min(s.avgAlgae, 10); break;
-              case 'Def': val = s.avgDefenceRating * 2; break;
-           }
-           entry[s.teamNumber] = val;
-        });
-        return entry;
-    });
+  // Comparison View
+  if (view === 'compare' && selectedTeams.length > 1) {
+    const chartData = selectedStats.map(s => ({
+       name: s.teamNumber,
+       L1: s.avgL1, L2: s.avgL2, L3: s.avgL3, L4: s.avgL4,
+       Auto: s.avgAutoPoints, Teleop: s.avgTeleopPoints,
+       Accuracy: s.avgCoralAccuracy
+    }));
 
     return (
       <div className="min-h-screen bg-ga-dark text-gray-900 font-sans w-full max-w-7xl mx-auto shadow-2xl flex flex-col">
-         <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-50 flex items-center gap-4">
-            <button onClick={() => setView('leaderboard')} className="text-gray-500 hover:text-ga-accent font-bold text-lg">← Back</button>
-            <h2 className="text-xl font-bold text-ga-accent">Comparison</h2>
-         </div>
-
-         <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 flex-1 overflow-y-auto">
-            {/* Coral L1-L4 Breakdown (Stacked) */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 flex flex-col">
-              <h4 className="text-sm font-bold text-gray-500 mb-2">Coral Level Breakdown</h4>
+        <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-50 flex items-center gap-4">
+             <button onClick={() => setView('leaderboard')} className="text-gray-500 hover:text-ga-accent font-bold text-lg">← Back</button>
+             <h2 className="text-2xl font-bold text-ga-accent">Comparison ({selectedTeams.join(', ')})</h2>
+        </div>
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
+           {/* Coral L1-L4 Breakdown */}
+           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 flex flex-col">
+              <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase text-center">Avg Coral Breakdown</h3>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={selectedStats}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="teamNumber" tick={{fontSize: 12}} />
-                  <YAxis />
-                  <Tooltip cursor={{fill: '#F9FAFB'}} />
-                  <Legend />
-                  <Bar dataKey="avgL4" name="L4" fill="#26C6DA" stackId="coral" />
-                  <Bar dataKey="avgL3" name="L3" fill="#4DD0E1" stackId="coral" />
-                  <Bar dataKey="avgL2" name="L2" fill="#80DEEA" stackId="coral" />
-                  <Bar dataKey="avgL1" name="L1" fill="#B2EBF2" stackId="coral" />
-                </BarChart>
+                 <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip cursor={{fill: 'transparent'}} />
+                    <Legend />
+                    <Bar dataKey="L1" stackId="a" fill="#B2EBF2" />
+                    <Bar dataKey="L2" stackId="a" fill="#80DEEA" />
+                    <Bar dataKey="L3" stackId="a" fill="#4DD0E1" />
+                    <Bar dataKey="L4" stackId="a" fill="#26C6DA" />
+                 </BarChart>
               </ResponsiveContainer>
-            </div>
-
-            {/* Coral Accuracy */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 flex flex-col">
-              <h4 className="text-sm font-bold text-gray-500 mb-2">Coral Accuracy (%)</h4>
+           </div>
+           
+           {/* Coral Accuracy Chart */}
+           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 flex flex-col">
+              <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase text-center">Avg Coral Accuracy (%)</h3>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={selectedStats}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="teamNumber" tick={{fontSize: 12}} />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip cursor={{fill: '#F9FAFB'}} />
-                  <Legend />
-                  <Bar dataKey="avgCoralAccuracy" name="Accuracy" fill="#006064" />
-                </BarChart>
+                 <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip cursor={{fill: 'transparent'}} />
+                    <Bar dataKey="Accuracy" fill="#006064" radius={[4, 4, 0, 0]} />
+                 </BarChart>
               </ResponsiveContainer>
-            </div>
+           </div>
 
-            {/* Radar Comparison */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 flex flex-col">
-               <h4 className="text-sm font-bold text-gray-500 mb-2">Profile Comparison</h4>
+           {/* Spider Chart comparison (First 3 teams only for readability) */}
+           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 h-80 md:col-span-2 flex flex-col items-center">
+               <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">Robot Profiles (Top 3)</h3>
                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={comparisonRadarData}>
-                     <PolarGrid />
-                     <PolarAngleAxis dataKey="subject" />
-                     {selectedStats.map((s, i) => (
-                        <Radar 
-                           key={s.teamNumber}
-                           name={s.teamNumber} 
-                           dataKey={s.teamNumber}
-                           stroke={['#1e3a8a', '#EF5350', '#00ACC1', '#7E57C2', '#FBC02D'][i % 5]} 
-                           fill={['#1e3a8a', '#EF5350', '#00ACC1', '#7E57C2', '#FBC02D'][i % 5]} 
-                           fillOpacity={0.1} 
-                        />
-                     ))}
-                     <Legend />
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
+                      { subject: 'Auto', fullMark: 15 },
+                      { subject: 'Teleop', fullMark: 25 },
+                      { subject: 'L4', fullMark: 5 },
+                      { subject: 'Algae', fullMark: 6 },
+                  ].map((dim, i) => {
+                      const point: any = { subject: dim.subject, fullMark: dim.fullMark };
+                      selectedStats.slice(0, 3).forEach((s, idx) => {
+                          if (dim.subject === 'Auto') point[`t${idx}`] = s.avgAutoPoints;
+                          if (dim.subject === 'Teleop') point[`t${idx}`] = s.avgTeleopPoints;
+                          if (dim.subject === 'L4') point[`t${idx}`] = s.avgL4;
+                          if (dim.subject === 'Algae') point[`t${idx}`] = s.avgAlgae;
+                      });
+                      return point;
+                  })}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="subject" />
+                      <PolarRadiusAxis />
+                      {selectedStats.slice(0, 3).map((s, idx) => (
+                          <Radar key={s.teamNumber} name={s.teamNumber} dataKey={`t${idx}`} stroke={['#FF5722', '#2196F3', '#4CAF50'][idx]} fill={['#FF5722', '#2196F3', '#4CAF50'][idx]} fillOpacity={0.3} />
+                      ))}
+                      <Legend />
                   </RadarChart>
                </ResponsiveContainer>
-            </div>
+           </div>
+        </div>
 
-            {/* Detailed Stats Table */}
-            <div className="col-span-1 md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                            <tr>
-                                <th className="px-4 py-3">Team</th>
-                                <th className="px-4 py-3">Matches</th>
-                                <th className="px-4 py-3">Avg Total</th>
-                                <th className="px-4 py-3">Avg Auto</th>
-                                <th className="px-4 py-3">Avg Teleop</th>
-                                <th className="px-4 py-3">L4</th>
-                                <th className="px-4 py-3">L3</th>
-                                <th className="px-4 py-3">L2</th>
-                                <th className="px-4 py-3">L1</th>
-                                <th className="px-4 py-3">Proc</th>
-                                <th className="px-4 py-3">Net</th>
-                                <th className="px-4 py-3">Acc %</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {selectedStats.map(s => (
-                                <tr key={s.teamNumber} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 font-bold">{s.teamNumber}</td>
-                                    <td className="px-4 py-3">{s.matchesPlayed}</td>
-                                    <td className="px-4 py-3 font-bold text-blue-800">{s.avgTotalPoints}</td>
-                                    <td className="px-4 py-3">{s.avgAutoPoints}</td>
-                                    <td className="px-4 py-3">{s.avgTeleopPoints}</td>
-                                    <td className="px-4 py-3 font-bold text-cyan-600">{s.avgL4}</td>
-                                    <td className="px-4 py-3">{s.avgL3}</td>
-                                    <td className="px-4 py-3">{s.avgL2}</td>
-                                    <td className="px-4 py-3">{s.avgL1}</td>
-                                    <td className="px-4 py-3">{s.avgProcessor}</td>
-                                    <td className="px-4 py-3">{s.avgNet}</td>
-                                    <td className="px-4 py-3 font-bold">{s.avgCoralAccuracy}%</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-         </div>
+        {/* Detailed Comparison Table */}
+        <div className="bg-white p-6 m-4 mt-0 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+             <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Detailed Stats Comparison</h3>
+             <table className="w-full text-sm text-center">
+                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                     <tr>
+                         <th className="px-4 py-3 text-left">Team</th>
+                         <th className="px-4 py-3">Matches</th>
+                         <th className="px-4 py-3">Auto</th>
+                         <th className="px-4 py-3">Teleop</th>
+                         <th className="px-4 py-3 font-bold text-cyan-600">Coral</th>
+                         <th className="px-4 py-3 text-cyan-600">Acc %</th>
+                         <th className="px-4 py-3 text-purple-600">Algae</th>
+                         <th className="px-4 py-3">Def Rating</th>
+                     </tr>
+                 </thead>
+                 <tbody>
+                     {selectedStats.map(s => (
+                         <tr key={s.teamNumber} className="border-b last:border-0 hover:bg-gray-50">
+                             <td className="px-4 py-3 text-left font-bold text-lg text-ga-accent">{s.teamNumber}</td>
+                             <td className="px-4 py-3">{s.matchesPlayed}</td>
+                             <td className="px-4 py-3">{s.avgAutoPoints}</td>
+                             <td className="px-4 py-3">{s.avgTeleopPoints}</td>
+                             <td className="px-4 py-3 font-bold bg-cyan-50/50">{s.avgCoral}</td>
+                             <td className="px-4 py-3">{s.avgCoralAccuracy}%</td>
+                             <td className="px-4 py-3 bg-purple-50/50">{s.avgAlgae}</td>
+                             <td className="px-4 py-3">{s.avgDefenceRating > 0 ? s.avgDefenceRating : '-'}</td>
+                         </tr>
+                     ))}
+                 </tbody>
+             </table>
+        </div>
       </div>
     );
   }
 
-  // --- ANALYSIS (SCATTER) VIEW ---
-  if (view === 'analysis') {
-    return (
-        <div className="min-h-screen bg-ga-dark text-gray-900 font-sans w-full max-w-7xl mx-auto shadow-2xl flex flex-col">
-           <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-50 flex items-center justify-between">
-              <button onClick={() => setView('leaderboard')} className="text-gray-500 hover:text-ga-accent font-bold text-lg">← Leaderboard</button>
-              <h2 className="text-xl font-bold text-ga-accent">Global Analysis</h2>
-              <div className="w-8"></div>
-           </div>
-           <div className="flex-1 p-4 flex flex-col items-center justify-center bg-gray-50">
-               <div className="bg-white p-6 rounded-xl shadow-lg border w-full max-w-4xl h-[600px] flex flex-col">
-                  <h3 className="text-lg font-bold text-gray-700 mb-2">Auto vs Teleop Distribution</h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid />
-                      <XAxis type="number" dataKey="avgAutoPoints" name="Auto" label={{ value: 'Auto Points', position: 'bottom' }} />
-                      <YAxis type="number" dataKey="avgTeleopPoints" name="Teleop" label={{ value: 'Teleop Points', angle: -90, position: 'insideLeft' }} />
-                      <ZAxis type="number" dataKey="avgOverall" range={[60, 400]} />
-                      <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                      <Scatter name="Teams" data={stats.filter(s => s.matchesPlayed > 0)} fill="#1e3a8a">
-                         {/* Removed LabelList to show team numbers only on hover */}
-                      </Scatter>
-                    </ScatterChart>
-                  </ResponsiveContainer>
-               </div>
-           </div>
-        </div>
-    );
-  }
-
-  // --- LEADERBOARD VIEW ---
+  // Leaderboard / Main View
   return (
     <div className="min-h-screen bg-ga-dark text-gray-900 font-sans w-full max-w-7xl mx-auto shadow-2xl flex flex-col">
-       <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-50 flex items-center justify-between shadow-sm">
-          <button onClick={onBack} className="text-gray-500 hover:text-ga-accent font-bold text-lg">← Home</button>
-          <div className="flex bg-gray-100 rounded-lg p-1">
-             <button onClick={() => setView('leaderboard')} className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${view === 'leaderboard' ? 'bg-white shadow text-ga-accent' : 'text-gray-400'}`}>List</button>
-             <button onClick={() => setView('analysis')} className="px-3 py-1 rounded-md text-sm font-bold transition-all text-gray-400">Scatter</button>
-          </div>
-          <div className="text-right text-xs font-bold text-gray-400">Selected: {selectedTeams.length}/8</div>
-       </div>
+      {/* Dashboard Header */}
+      <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-50 flex flex-col gap-4 shadow-sm">
+         <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+                <Button onClick={onBack} variant="ghost" className="px-2">←</Button>
+                <h1 className="text-2xl font-bold tracking-tight text-ga-accent">Dashboard</h1>
+            </div>
+            <div className="flex items-center gap-2">
+                 <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept=".json,.csv"
+                    onChange={handleFileUpload}
+                 />
+                 <Button variant="ghost" className="text-xs" onClick={() => fileInputRef.current?.click()}>
+                   Import
+                 </Button>
+                 <Button variant="ghost" className="text-xs text-yellow-600 bg-yellow-50" onClick={generateMockData}>
+                   ⚡ Mock
+                 </Button>
+            </div>
+         </div>
+         
+         {/* Controls */}
+         <div className="flex flex-wrap items-center gap-3">
+            {/* Search Input */}
+             <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Search Team..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 pr-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-ga-accent focus:outline-none w-32 md:w-48"
+                />
+                <svg className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+             </div>
 
-       <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="bg-white p-4 border-b border-gray-200 space-y-4">
-             <div className="flex flex-wrap gap-2 items-center">
-                <button onClick={() => setFilterDefence(!filterDefence)} className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all ${filterDefence ? 'bg-green-100 border-green-500 text-green-700' : 'bg-red-50 border-red-500 text-red-700'}`}>{filterDefence ? 'Def Filter ON' : 'Def Filter OFF'}</button>
-                <button onClick={() => setUseApiData(!useApiData)} disabled={loadingEpa} className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all ${useApiData ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>{loadingEpa ? 'Loading...' : 'Include Statbotics EPA'}</button>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".json,.csv" className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 rounded-lg text-xs font-bold border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 ml-auto flex items-center gap-1"><span>📥 Import</span></button>
-                <button onClick={generateMockData} className="px-4 py-2 rounded-lg text-xs font-bold border border-yellow-300 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 flex items-center gap-1"><span>⚡ Mock</span></button>
+             <div className="h-8 w-px bg-gray-300 mx-1"></div>
+
+             {/* Metric Toggles */}
+             <div className="flex gap-1 overflow-x-auto no-scrollbar max-w-full pb-1">
+               <button 
+                  onClick={() => setVisibleMetrics(new Set())}
+                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${visibleMetrics.size === 0 ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border-gray-200'}`}
+               >
+                 All
+               </button>
+               {['Summary', 'Coral', 'Algae'].map(grp => (
+                  <button 
+                    key={grp}
+                    onClick={() => {
+                       const groupMetrics = METRICS.filter(m => m.group === grp).map(m => m.key);
+                       setVisibleMetrics(new Set(groupMetrics));
+                    }}
+                    className="px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    {grp}
+                  </button>
+               ))}
              </div>
-             <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Columns</label>
-                <div className="flex flex-wrap gap-2">
-                   {METRICS.filter(m => !['avgL1','avgL2','avgL3','avgL4'].includes(m.key)).map(m => ( <button key={m.key} onClick={() => toggleMetric(m.key as string)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${visibleMetrics.has(m.key as string) ? 'bg-ga-accent text-white border-ga-accent shadow' : 'bg-white text-gray-600 border-gray-200'}`}>{m.label}</button> ))}
-                   {visibleMetrics.size > 0 && ( <button onClick={() => setVisibleMetrics(new Set())} className="px-3 py-1.5 rounded-full text-xs font-bold text-red-500 hover:bg-red-50 ml-2">Clear</button> )}
-                </div>
+         </div>
+
+         {/* Filters & Actions Row */}
+         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
+             <div className="flex gap-2">
+                 {/* Defense Toggle: Green if Active (True), Red if Inactive (False) */}
+                 <button 
+                    onClick={() => setFilterDefence(!filterDefence)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors flex items-center gap-2 ${
+                        filterDefence 
+                          ? 'bg-green-100 text-green-700 border-green-200' 
+                          : 'bg-red-50 text-red-600 border-red-100'
+                    }`}
+                 >
+                    <span className={`w-2 h-2 rounded-full ${filterDefence ? 'bg-green-500' : 'bg-red-400'}`}></span>
+                    Defense Filter: {filterDefence ? 'ON' : 'OFF'}
+                 </button>
+
+                 <button 
+                    onClick={() => setUseApiData(!useApiData)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${useApiData ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                 >
+                    {useApiData ? 'API: Hybrid (3:2)' : 'API: Off'} {loadingEpa && '...'}
+                 </button>
              </div>
-          </div>
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-0 md:p-4">
-             <div className="bg-white md:rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
-                   <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
-                      <tr>
-                         <th className="px-3 py-4 w-10 text-center sticky left-0 bg-gray-50 z-20">#</th>
-                         <th className="px-3 py-4 sticky left-10 bg-gray-50 z-20">Team</th>
-                         {activeMetrics.map(m => ( 
-                           <th 
-                              key={m.key} 
-                              onClick={() => handleHeaderClick(m.key)} 
-                              className="px-3 py-4 text-right cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap min-w-[70px]"
-                              title={m.key === 'avgCoral' ? "Click to toggle L1-L4 breakdown" : ""}
-                            >
-                              <div className="flex items-center justify-end gap-1">
-                                <span className={`${sortKey === m.key ? 'text-ga-accent font-bold' : ''} ${m.key === 'avgCoral' ? 'underline decoration-dotted' : ''}`}>{m.label}</span>
-                                {sortKey === m.key && <span className="text-ga-accent">{sortDesc ? '↓' : '↑'}</span>}
-                              </div>
-                            </th> 
-                          ))}
-                         <th className="px-3 py-4 text-right w-12 text-gray-400">Plays</th>
-                         <th className="px-3 py-4 w-8"></th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-gray-100">
-                      {stats.map((s, idx) => {
-                        const isSelected = selectedTeams.includes(s.teamNumber);
-                        const hasData = s.matchesPlayed > 0 || (useApiData && s.epaTotal !== undefined);
-                        return (
-                          <tr key={s.teamNumber} onClick={() => toggleTeamSelect(s.teamNumber)} className={`transition-colors cursor-pointer select-none group ${isSelected ? 'bg-blue-50/80 hover:bg-blue-100' : 'hover:bg-gray-50'}`}>
-                             <td className="px-3 py-3 text-center font-mono text-gray-400 text-xs sticky left-0 bg-inherit z-10">{idx + 1}</td>
-                             <td className="px-3 py-3 font-bold text-gray-900 sticky left-10 bg-inherit z-10">{s.teamNumber}</td>
-                             {activeMetrics.map(m => ( <td key={m.key} className={`px-3 py-3 text-right whitespace-nowrap ${sortKey === m.key ? 'font-bold bg-gray-50/50' : 'text-gray-600'}`}>{hasData ? (s[m.key] as number) : '-'}</td> ))}
-                             <td className="px-3 py-3 text-right text-gray-400 text-xs">{s.matchesPlayed}</td>
-                             <td className="px-3 py-3 text-center"><div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-ga-accent border-ga-accent' : 'border-gray-200 bg-white group-hover:border-gray-300'}`}>{isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}</div></td>
-                          </tr>
-                        );
-                      })}
-                   </tbody>
+
+             <div className="flex gap-2">
+                 <button 
+                    onClick={() => setView(view === 'analysis' ? 'leaderboard' : 'analysis')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-300 hover:bg-gray-50"
+                 >
+                    {view === 'analysis' ? 'List View' : 'Scatter View'}
+                 </button>
+                 {selectedTeams.length > 0 && (
+                     <button 
+                       onClick={() => selectedTeams.length === 1 ? setView('team_detail') : setView('compare')}
+                       className="px-4 py-1.5 rounded-lg text-xs font-bold bg-ga-accent text-white shadow-md animate-pulse-slow"
+                     >
+                       {selectedTeams.length === 1 ? 'View Team' : `Compare (${selectedTeams.length})`}
+                     </button>
+                 )}
+             </div>
+         </div>
+      </div>
+
+      <div className="flex-1 overflow-hidden relative">
+          {view === 'analysis' ? (
+              <div className="w-full h-full p-4 bg-gray-50">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                          <CartesianGrid />
+                          <XAxis type="number" dataKey="avgAutoPoints" name="Auto" unit="pts" label={{ value: 'Auto Points', position: 'bottom' }} />
+                          <YAxis type="number" dataKey="avgTeleopPoints" name="Teleop" unit="pts" label={{ value: 'Teleop Points', angle: -90, position: 'left' }} />
+                          <ZAxis type="number" dataKey="avgOverall" range={[50, 400]} name="Score" />
+                          <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                      <div className="bg-white p-2 border border-gray-200 shadow-lg rounded text-xs">
+                                          <p className="font-bold text-ga-accent">Team {data.teamNumber}</p>
+                                          <p>Auto: {data.avgAutoPoints}</p>
+                                          <p>Tele: {data.avgTeleopPoints}</p>
+                                          <p>Overall: {data.avgOverall}</p>
+                                      </div>
+                                  );
+                              }
+                              return null;
+                          }} />
+                          <Scatter name="Teams" data={stats} fill="#1e3a8a" />
+                      </ScatterChart>
+                  </ResponsiveContainer>
+              </div>
+          ) : (
+             <div className="w-full h-full overflow-auto">
+                <table className="w-full text-sm text-left border-collapse relative">
+                    <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b sticky top-0 z-40">
+                        <tr>
+                            {/* Sticky Rank Column */}
+                            <th className="px-4 py-3 sticky left-0 z-50 bg-gray-50 w-12 text-center border-b">#</th>
+                            
+                            {/* Sticky Team Column with Shadow */}
+                            <th className="px-4 py-3 sticky left-12 z-50 bg-gray-50 w-24 border-b border-r shadow-[4px_0_5px_-2px_rgba(0,0,0,0.1)]">Team</th>
+                            
+                            {activeMetrics.map(m => (
+                                <th 
+                                    key={m.key} 
+                                    className={`px-4 py-3 cursor-pointer hover:text-ga-accent hover:bg-gray-100 transition-colors whitespace-nowrap ${sortKey === m.key ? 'text-ga-accent font-bold bg-blue-50' : ''}`}
+                                    onClick={() => handleHeaderClick(m.key)}
+                                >
+                                    {m.label} {sortKey === m.key ? (sortDesc ? '↓' : '↑') : ''}
+                                    {m.key === 'avgCoral' && <span className="ml-1 text-[10px] text-gray-400">({showCoralBreakdown ? '-' : '+'})</span>}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {stats.map((s, idx) => (
+                           <tr 
+                             key={s.teamNumber} 
+                             className={`hover:bg-blue-50/30 transition-colors ${selectedTeams.includes(s.teamNumber) ? 'bg-blue-50' : 'bg-white'}`}
+                             onClick={() => toggleTeamSelect(s.teamNumber)}
+                           >
+                               {/* Sticky Rank Cell */}
+                               <td className={`px-4 py-3 font-mono text-gray-400 text-center sticky left-0 z-30 w-12 ${selectedTeams.includes(s.teamNumber) ? 'bg-blue-50' : 'bg-white'}`}>
+                                 {idx + 1}
+                               </td>
+
+                               {/* Sticky Team Cell with Shadow */}
+                               <td className={`px-4 py-3 font-bold text-gray-900 sticky left-12 z-30 w-24 border-r shadow-[4px_0_5px_-2px_rgba(0,0,0,0.1)] ${selectedTeams.includes(s.teamNumber) ? 'bg-blue-50' : 'bg-white'}`}>
+                                 {s.teamNumber}
+                                 {s.source === 'Hybrid' && <span className="ml-1 text-[9px] text-blue-500 bg-blue-100 px-1 rounded">API</span>}
+                               </td>
+
+                               {activeMetrics.map(m => (
+                                   <td key={m.key} className={`px-4 py-3 font-medium ${m.key === 'avgOverall' ? 'text-ga-accent font-bold bg-blue-50/30' : 'text-gray-600'}`}>
+                                       {s[m.key]}
+                                   </td>
+                               ))}
+                           </tr>
+                        ))}
+                        {stats.length === 0 && (
+                            <tr>
+                                <td colSpan={METRICS.length + 2} className="p-8 text-center text-gray-400">
+                                    No data available. Add matches or click "⚡ Mock".
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
                 </table>
-                </div>
              </div>
-          </div>
-       </div>
-
-       {selectedTeams.length >= 1 && (
-          <div className="fixed bottom-6 right-6 z-50 animate-bounce-in">
-             <button disabled={selectedTeams.length > 8} onClick={() => selectedTeams.length === 1 ? setView('team_detail') : setView('compare')} className="h-14 px-6 rounded-full bg-ga-accent hover:bg-ga-accentHover text-white shadow-xl flex items-center gap-2 font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105">
-                {selectedTeams.length === 1 ? ( <><span>View Team {selectedTeams[0]}</span></> ) : ( <><span>Compare ({selectedTeams.length})</span></> )}
-             </button>
-          </div>
-       )}
+          )}
+      </div>
     </div>
   );
 };
