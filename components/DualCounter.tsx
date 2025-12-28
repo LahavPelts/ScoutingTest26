@@ -1,4 +1,7 @@
 import React from 'react';
+import { Box, Typography, IconButton, Paper, Divider } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
 
 interface DualCounterProps {
   label: string;
@@ -16,51 +19,67 @@ export const DualCounter: React.FC<DualCounterProps> = ({
   onChangeMissed 
 }) => {
   return (
-    <div className="flex flex-col w-full shadow-sm rounded-lg overflow-hidden border border-gray-200">
-      <div className="bg-gray-50 px-2 py-1 text-center text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200">
-        {label}
-      </div>
-      <div className="flex h-14">
-        {/* Made Section (Green/Blue/Accent) */}
-        <div className="flex-1 flex bg-white relative group">
-           <button 
-             onClick={() => onChangeMade(Math.max(0, made - 1))}
-             className="w-10 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-lg flex items-center justify-center transition-colors border-r border-gray-100"
-           >
-             -
-           </button>
-           <div className="flex-1 flex items-center justify-center font-bold text-xl text-ga-accent bg-blue-50/30">
-             {made}
-           </div>
-           <button 
-             onClick={() => onChangeMade(made + 1)}
-             className="w-12 bg-ga-accent hover:bg-ga-accentHover text-white font-bold text-xl flex items-center justify-center transition-colors"
-           >
-             +
-           </button>
-        </div>
+    <Paper 
+      variant="outlined" 
+      sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        borderRadius: 2,
+        overflow: 'hidden',
+        mb: 1
+      }}
+    >
+      <Box sx={{ bgcolor: 'action.hover', py: 0.25, textAlign: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ textTransform: 'uppercase' }}>
+          {label}
+        </Typography>
+      </Box>
+      
+      <Box sx={{ display: 'flex', height: 48 }}>
+        {/* Success Section */}
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+          <IconButton 
+            size="small" 
+            onClick={() => onChangeMade(Math.max(0, made - 1))}
+            sx={{ borderRadius: 0, height: '100%', width: 40 }}
+          >
+            <RemoveIcon fontSize="small" />
+          </IconButton>
+          
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'primary.light', color: 'white' }}>
+            <Typography variant="h6" fontWeight="bold">{made}</Typography>
+          </Box>
+          
+          <IconButton 
+            size="small" 
+            onClick={() => onChangeMade(made + 1)}
+            sx={{ borderRadius: 0, height: '100%', width: 44, bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}
+          >
+            <AddIcon />
+          </IconButton>
+        </Box>
 
-        {/* Divider */}
-        <div className="w-px bg-gray-300"></div>
+        <Divider orientation="vertical" flexItem />
 
-        {/* Missed Section (Red) */}
-        <div className="w-1/3 flex bg-red-50 relative">
-           <div className="flex-1 flex items-center justify-center font-bold text-red-600">
-              <span className="text-xs mr-1 text-red-400">miss</span>
-              {missed}
-           </div>
-           <button 
-             onClick={() => onChangeMissed(missed + 1)}
-             className="w-10 bg-red-100 hover:bg-red-200 text-red-600 font-bold text-lg flex items-center justify-center transition-colors border-l border-red-200"
-             onContextMenu={(e) => {
+        {/* Miss Section */}
+        <Box sx={{ width: '35%', display: 'flex', alignItems: 'center', bgcolor: 'error.light', color: 'white' }}>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography variant="caption" sx={{ lineHeight: 1, opacity: 0.8 }}>MISS</Typography>
+            <Typography variant="h6" fontWeight="bold" sx={{ lineHeight: 1 }}>{missed}</Typography>
+          </Box>
+          <IconButton 
+            size="small" 
+            onClick={() => onChangeMissed(missed + 1)}
+            onContextMenu={(e) => {
                 e.preventDefault();
                 onChangeMissed(Math.max(0, missed - 1));
-             }}
-           >
-             +
-           </button>
-        </div>
-      </div>
-    </div>
+            }}
+            sx={{ borderRadius: 0, height: '100%', width: 40, bgcolor: 'error.main', color: 'white', '&:hover': { bgcolor: 'error.dark' } }}
+          >
+            <AddIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      </Box>
+    </Paper>
   );
 };

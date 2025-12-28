@@ -1,4 +1,7 @@
 import React from 'react';
+import { Paper, IconButton, Typography, Box } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
 
 interface CounterProps {
   label: string;
@@ -8,22 +11,47 @@ interface CounterProps {
 
 export const Counter: React.FC<CounterProps> = ({ label, value, onChange }) => {
   return (
-    <div className="flex items-center gap-2 w-full h-16">
-      {/* Main Label and Count Box */}
-      <button 
+    <Paper 
+      elevation={0} 
+      variant="outlined"
+      sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        p: 0.5, 
+        bgcolor: 'background.paper',
+        borderColor: 'primary.light',
+        borderWidth: 1,
+        borderRadius: 2
+      }}
+    >
+      <Box 
+        sx={{ 
+          flexGrow: 1, 
+          pl: 2, 
+          display: 'flex', 
+          alignItems: 'center', 
+          bgcolor: 'primary.main', 
+          borderRadius: 1.5,
+          py: 1,
+          boxShadow: 1
+        }}
         onClick={() => onChange(value + 1)}
-        className="flex-1 h-full bg-ga-accent hover:bg-ga-accentHover rounded-l-lg flex items-center justify-center text-white font-bold text-lg shadow-lg active:opacity-90 transition-all"
       >
-        {label} = {value}
-      </button>
+        <Typography variant="body1" sx={{ color: 'white', fontWeight: 'bold' }}>
+          {label}
+        </Typography>
+        <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold', ml: 'auto', mr: 2 }}>
+          {value}
+        </Typography>
+      </Box>
 
-      {/* Minus Button */}
-      <button 
+      <IconButton 
         onClick={() => onChange(Math.max(0, value - 1))}
-        className="w-16 h-full bg-ga-accent hover:bg-ga-accentHover rounded-r-lg flex items-center justify-center text-white font-bold text-2xl shadow-lg active:opacity-90 transition-all"
+        color="primary"
+        sx={{ ml: 1, border: '1px solid', borderColor: 'divider' }}
       >
-        -
-      </button>
-    </div>
+        <RemoveIcon />
+      </IconButton>
+    </Paper>
   );
 };

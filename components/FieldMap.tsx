@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { Box, Typography } from '@mui/material';
 import { StartPosition } from '../types';
 
 interface FieldMapProps {
@@ -20,47 +20,79 @@ const positions: { key: StartPosition; top: string; label: string }[] = [
 export const FieldMap: React.FC<FieldMapProps> = ({ 
   selected, 
   onChange, 
-  // User must ensure field.png exists in public/ folder
   imageUrl = "/field.png" 
 }) => {
   return (
-    <div className="w-full max-w-[560px] mx-auto">
-      <div 
-        className="relative w-full rounded-lg overflow-hidden bg-white border border-gray-300 shadow-md"
-        style={{ 
+    <Box sx={{ width: '100%', maxWidth: 560, mx: 'auto', mt: 1 }}>
+      <Box 
+        sx={{ 
+          position: 'relative',
+          width: '100%',
           aspectRatio: '2 / 1',
+          borderRadius: 2,
+          overflow: 'hidden',
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
           backgroundImage: `url(${imageUrl})`, 
           backgroundSize: 'cover', 
           backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
+          backgroundRepeat: 'no-repeat',
+          boxShadow: 1
         }}
       >
         {/* Overlay Grid */}
         {positions.map((p) => (
-          <div
+          <Box
             key={p.key}
             role="button"
             onClick={() => onChange(p.key)}
-            className="absolute left-0 w-full h-[20%] cursor-pointer outline-none group"
-            style={{ top: p.top }}
+            sx={{
+              position: 'absolute',
+              left: 0,
+              top: p.top,
+              width: '100%',
+              height: '20%',
+              cursor: 'pointer',
+              '&:hover': {
+                bgcolor: selected === p.key ? 'transparent' : 'rgba(33, 150, 243, 0.1)'
+              }
+            }}
           >
-            {/* Hover Effect */}
-            <div className={`absolute inset-0 transition-colors duration-200 ${selected === p.key ? '' : 'group-hover:bg-[#2196f3]/10'}`} />
-            
-            {/* Selection Highlight - "Lil Blue" */}
+            {/* Selection Highlight */}
             {selected === p.key && (
-              <div className="absolute inset-0 bg-[#2196f3]/40 border-y border-[#2196f3] flex items-center justify-center animate-pulse-slow">
-                 <span className="bg-white/90 text-[#1e3a8a] px-2 py-0.5 rounded text-xs font-bold shadow-sm backdrop-blur-sm">
+              <Box 
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: 'rgba(33, 150, 243, 0.4)',
+                  borderTop: '1px solid #2196f3',
+                  borderBottom: '1px solid #2196f3',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                 <Typography 
+                   variant="caption" 
+                   sx={{ 
+                     bgcolor: 'rgba(255,255,255,0.9)', 
+                     color: 'primary.main', 
+                     px: 1, 
+                     borderRadius: 1, 
+                     fontWeight: 'bold' 
+                   }}
+                 >
                    {p.label}
-                 </span>
-              </div>
+                 </Typography>
+              </Box>
             )}
-          </div>
+          </Box>
         ))}
-      </div>
-      <div className="text-center mt-2 text-xs text-gray-400 font-medium uppercase tracking-wide">
+      </Box>
+      <Typography align="center" variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textTransform: 'uppercase', letterSpacing: 1 }}>
         {selected ? `Selected: ${selected}` : "Select Starting Position"}
-      </div>
-    </div>
+      </Typography>
+    </Box>
   );
 };

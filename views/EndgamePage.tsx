@@ -1,8 +1,10 @@
-
 import React from 'react';
 import { ScoutEntry, EndgameData, CageType } from '../types';
 import { StarRating } from '../components/StarRating';
-import { Button } from '../components/Button';
+import { 
+  Box, Button, Typography, Card, CardContent, ToggleButton, 
+  ToggleButtonGroup, TextField, Switch, FormControlLabel 
+} from '@mui/material';
 
 interface EndgamePageProps {
   data: ScoutEntry;
@@ -17,85 +19,91 @@ export const EndgamePage: React.FC<EndgamePageProps> = ({ data, updateData, onSu
     });
   };
 
-  const CageOption = ({ type, label }: { type: CageType, label: string }) => (
-    <button
-      onClick={() => updateEndgame('cage', type)}
-      className={`flex-1 py-3 px-2 rounded-lg font-bold text-sm transition-all border ${
-        data.endgame.cage === type 
-          ? 'bg-ga-accent text-white border-ga-accent shadow-md scale-105' 
-          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const handleCageChange = (_: React.MouseEvent<HTMLElement>, newCage: CageType | null) => {
+    if (newCage) updateEndgame('cage', newCage);
+  };
 
   return (
-    <div className="space-y-6 pb-20 animate-fade-in">
-      
+    <Box sx={{ pb: 10 }}>
       {/* Cage / Climb Selection */}
-      <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100">
-        <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider mb-3">Cage / Climb</h3>
-        <div className="flex gap-2 w-full">
-          <CageOption type={CageType.DEEP} label="Deep" />
-          <CageOption type={CageType.SHALLOW} label="Shallow" />
-          <CageOption type={CageType.PARK} label="Park" />
-          <CageOption type={CageType.NONE} label="None" />
-        </div>
-      </div>
+      <Card variant="outlined" sx={{ mb: 3, bgcolor: '#fff3e0', borderColor: '#ffcc80' }}>
+        <CardContent>
+            <Typography variant="subtitle2" color="warning.dark" gutterBottom fontWeight="bold" sx={{ textTransform: 'uppercase' }}>
+                Cage / Climb
+            </Typography>
+            <ToggleButtonGroup
+                value={data.endgame.cage}
+                exclusive
+                onChange={handleCageChange}
+                fullWidth
+                size="small"
+                color="warning"
+                sx={{ bgcolor: 'white' }}
+            >
+                <ToggleButton value={CageType.DEEP}>Deep</ToggleButton>
+                <ToggleButton value={CageType.SHALLOW}>Shallow</ToggleButton>
+                <ToggleButton value={CageType.PARK}>Park</ToggleButton>
+                <ToggleButton value={CageType.NONE}>None</ToggleButton>
+            </ToggleButtonGroup>
+        </CardContent>
+      </Card>
 
-      <StarRating 
-        label="Defence Level" 
-        value={data.endgame.defenceLevel} 
-        onChange={(v) => updateEndgame('defenceLevel', v)} 
+      <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+        <StarRating 
+            label="Defence Level" 
+            value={data.endgame.defenceLevel} 
+            onChange={(v) => updateEndgame('defenceLevel', v)} 
+        />
+        <StarRating 
+            label="Driving Level" 
+            value={data.endgame.drivingLevel} 
+            onChange={(v) => updateEndgame('drivingLevel', v)} 
+        />
+        <StarRating 
+            label="Scouter Level" 
+            value={data.endgame.scouterLevel} 
+            onChange={(v) => updateEndgame('scouterLevel', v)} 
+        />
+      </Card>
+
+      {/* Disabled Toggle */}
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+            <FormControlLabel
+                control={
+                    <Switch
+                        checked={data.endgame.disabled}
+                        onChange={(e) => updateEndgame('disabled', e.target.checked)}
+                        color="error"
+                    />
+                }
+                label={<Typography fontWeight="bold">Robot Disabled?</Typography>}
+            />
+        </CardContent>
+      </Card>
+
+      <TextField
+        label="Comments"
+        multiline
+        rows={4}
+        fullWidth
+        variant="outlined"
+        placeholder="Enter comments here..."
+        value={data.endgame.comments}
+        onChange={(e) => updateEndgame('comments', e.target.value)}
+        sx={{ mb: 4, bgcolor: 'background.paper' }}
       />
 
-      <StarRating 
-        label="Driving Level" 
-        value={data.endgame.drivingLevel} 
-        onChange={(v) => updateEndgame('drivingLevel', v)} 
-      />
-
-      <StarRating 
-        label="Scouter Level" 
-        value={data.endgame.scouterLevel} 
-        onChange={(v) => updateEndgame('scouterLevel', v)} 
-      />
-
-       {/* Disabled Toggle */}
-       <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
-        <div className="flex justify-between items-center mb-2">
-            <span className="text-gray-700 font-bold ml-1">Disabled</span>
-        </div>
-        <div className="flex w-full bg-gray-50 rounded-lg p-1 border border-gray-100">
-           <button 
-             onClick={() => updateEndgame('disabled', true)}
-             className={`flex-1 py-3 rounded-md transition-all ${data.endgame.disabled ? 'bg-red-500 text-white font-bold shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-           >
-             YES
-           </button>
-           <button 
-             onClick={() => updateEndgame('disabled', false)}
-             className={`flex-1 py-3 rounded-md transition-all ${!data.endgame.disabled ? 'bg-ga-accent text-white font-bold shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-           >
-             NO
-           </button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-          <label className="text-gray-600 font-medium ml-1">Comments</label>
-          <textarea 
-            className="w-full h-24 bg-white border border-gray-300 rounded-lg p-3 text-gray-900 focus:outline-none focus:border-ga-accent focus:ring-1 focus:ring-ga-accent placeholder-gray-400"
-            placeholder="Enter comments here..."
-            value={data.endgame.comments}
-            onChange={(e) => updateEndgame('comments', e.target.value)}
-          />
-      </div>
-
-      <Button onClick={onSubmit} fullWidth className="mt-8 text-lg py-4 shadow-xl">
+      <Button 
+        variant="contained" 
+        color="secondary" 
+        size="large" 
+        fullWidth 
+        onClick={onSubmit}
+        sx={{ height: 56, fontSize: '1.1rem', fontWeight: 'bold' }}
+      >
         SEND DATA
       </Button>
-    </div>
+    </Box>
   );
 };

@@ -1,6 +1,7 @@
 import React from 'react';
+import { Button as MuiButton, ButtonProps as MuiButtonProps } from '@mui/material';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends Omit<MuiButtonProps, 'variant'> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   fullWidth?: boolean;
 }
@@ -9,24 +10,35 @@ export const Button: React.FC<ButtonProps> = ({
   children, 
   variant = 'primary', 
   fullWidth = false, 
-  className = '', 
+  sx,
   ...props 
 }) => {
-  const baseStyles = "px-6 py-3 rounded-lg font-bold transition-all duration-200 active:scale-95 shadow-md flex items-center justify-center";
+  let muiVariant: MuiButtonProps['variant'] = 'contained';
+  let color: MuiButtonProps['color'] = 'primary';
   
-  const variants = {
-    primary: "bg-ga-accent hover:bg-ga-accentHover text-white",
-    secondary: "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300",
-    danger: "bg-red-600 hover:bg-red-700 text-white",
-    ghost: "bg-transparent hover:bg-black/5 text-gray-700 shadow-none"
-  };
+  if (variant === 'secondary') {
+    muiVariant = 'outlined';
+    color = 'primary';
+  } else if (variant === 'danger') {
+    muiVariant = 'contained';
+    color = 'error';
+  } else if (variant === 'ghost') {
+    muiVariant = 'text';
+    color = 'inherit';
+  }
 
   return (
-    <button 
-      className={`${baseStyles} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
+    <MuiButton 
+      variant={muiVariant} 
+      color={color} 
+      fullWidth={fullWidth}
+      sx={{ 
+        boxShadow: variant === 'primary' ? 2 : 0,
+        ...sx 
+      }}
       {...props}
     >
       {children}
-    </button>
+    </MuiButton>
   );
 };
